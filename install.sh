@@ -10,24 +10,27 @@ if [ -f /etc/os-release ]; then
             sudo apt-get install macchanger -y -qq
             echo "=====> Installing tor bundle "
             sudo apt-get install tor -y -qq
+            pip install -r requirements.txt
             echo "=====> Done "
-            echo "=====> Open terminal and type 'python torphantom.py' for usage "
+            echo "=====> Open terminal and type 'python torphantom' for usage "
             ;;
         fedora|rhel|centos|rocky|alma)
             echo "=====> Installing macchanger "
             sudo yum -y -q macchanger
             echo "=====> Installing tor bundle "
             sudo yum -y -q tor
+            pip install -r requirements.txt
             echo "=====> Done "
-            echo "=====> Open terminal and type 'python torphantom.py' for usage "
+            echo "=====> Open terminal and type 'python torphantom' for usage "
             ;;
         arch|manjaro)
             echo "=====> Installing macchanger "
             sudo pacman -S --quiet --noconfirm --needed macchanger
             echo "=====> Installing tor bundle "
             sudo pacman -S --quiet --noconfirm --needed tor
+            pip install -r requirements.txt
             echo "=====> Done "
-            echo "=====> Open terminal and type 'python torphantom.py' for usage "
+            echo "=====> Open terminal and type 'python torphantom' for usage "
             ;;
         *)
             echo ""
@@ -41,6 +44,7 @@ if [ -f /etc/os-release ]; then
             echo "=====> Installing tor bundle "
             sudo port install tor
             sudo mv /opt/local/etc/tor/torrc.sample /opt/local/etc/tor/torrc
+            pip install -r requirements.txt
             echo "=====> Done "
             echo "=====> Open terminal and type 'python torphantom' for usage "
             ;;

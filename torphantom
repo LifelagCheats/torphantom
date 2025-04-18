@@ -9,25 +9,30 @@ from stem.control import Controller
 from stem import Signal
 import argparse
 import subprocess
+import logging
+import daemon
 
 console = Console()
 
-# TODO: delete the useless functions (marked with # !)
+logging.basicConfig(filename='torphantom.log', level=logging.DEBUG,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+
 
 def timelog(): 
 	current_time = time.localtime()
 	ctime = time.strftime('%H:%M:%S', current_time)
 	return f"[{ctime}]"
 
-def shutdown(): # ! useless
-	print("")
-	console.print("[bold red] [Info] - Shutting down TorPhantom")
-	sys.exit()
-
-
-def sigint_handler(signum, frame):  # ! useless
-    console.print('\n user interrupt ! shutting down')
-    shutdown()
+def change_mac(interface=str):
+	try:
+		console.print(f"[bold cyan] {timelog()} Changing mac adress...")
+		subprocess.run(['ip', 'link', 'set', str(interface), 'down'], check=True)
+		subprocess.run(['macchanger', '-r', interface], check=True)
+		subprocess.run(['ip', 'link', 'set', str(interface), 'up'], check=True)
+		logging.info(f"{timelog()} Mac adress changed by user")
+	except Exception as e:
+		console.print(f"[bold red] {timelog()} Unexpected error while changing mac: {e}")
+		logging.error(f"Unknown error {e}")
 
 def logo():
 	subprocess.run(["clear"], check=True, shell=False) # * logo
@@ -44,24 +49,21 @@ def logo():
 
 parser = argparse.ArgumentParser(
                                  prog="TorPhantom",
-                                 description=logo() + "Route your traffic through Tor network with TorPhantom.",
-                                 epilog="By @3ndG4me",
+                                 description=logo() + "Route your traffic through Tor network with TorReloaded.",
+                                 epilog="By @Lifelag",
                                  formatter_class=argparse.RawTextHelpFormatter
                              )
 subparsers = parser.add_subparsers(dest="command", required=True, help="Available commands")
 
+status_parser = subparsers.add_parser("status", help='Check the status of TorPhantom', description='Status check.')
+
 start_parser = subparsers.add_parser("start", help="Start TorPhantom", description="Start routing your traffic through Torphantom.")
+
+start_parser.add_argument('-i', '--interface', type=str, help='Specify the interface in which you want to change the MAC adress of.')
 
 stop_parser = subparsers.add_parser("stop", help="Stop TorPhantom")
 
 args = parser.parse_args()
-
-def internet_on(): # ! Don't use. Useless
-	try:
-		requests.get("https://google.com", timeout=5)
-		return True
-	except:
-		return False
 
 def tor_status():
 	response = requests.get("https://check.torproject.org", timeout=10)	
@@ -70,6 +72,17 @@ def tor_status():
 	else:
 		return False
 
+
+def check_status():
+	try:
+		response = requests.get("https://check.torproject.org", timeout=10)
+		if "Congratulations. This browser is configured to use Tor" in response.text:
+			console.print(f"{timelog()} [bold green] Tor is running!")
+		else:
+			console.print(f"{timelog()} [bold red] Tor is not running.")
+	except requests.RequestException:
+		console.print(f"{timelog()} [bold red] Unable to check Tor status.")
+		logging.error(e)
 
 def start(password):
 	try:
@@ -82,30 +95,43 @@ def start(password):
 			else:
 				console.print(f"{timelog()} [bold yellow] Error while starting Tor!")
 	except IncorrectPassword: # * Authentication
-		console.print(f"{timelog()} [bold red] Incorrect Password") 
+		console.print(f"{timelog()} [bold red] Incorrect Password")
+		logging.info(f"{timelog()} Unsuccessful authentication attempt")
 	except Exception as e:
 		console.print(f"{timelog()} [bold red] Error starting Tor: {e}")
+		logging.error(e)
 
-def stop(password):
+def stop(password, interface):
 	try:
 		with Controller.from_port(port=9051) as controller:
 			controller.authenticate(password=password)
 			console.print(f"{timelog()} Stopping Tor...")
 			controller.signal(Signal.SHUTDOWN)  # * Stop Tor gracefully
 			console.print(f"{timelog()} [bold yellow] Tor has been stopped.")
+		if args.interface:
+			subprocess.run(['macchanger', '-p', interface])
 	except IncorrectPassword:
 		console.print(f"{timelog()} [bold red] Incorrect Password")
+		logging.info(f"{timelog()} Unsuccessful authentication attempt")
 	except Exception as e:
 		console.print(f"{timelog()} [bold red] Error stopping Tor: {e}")
+		logging.error(e)
+
 
 def main(): # ? main loop
-	if args.command == "start":
-		pswd = console.input("[bold cyan] Enter your password to activate Tor: ")
-		start(pswd)
-	elif args.command == "stop":
-		pswd = console.input("[bold cyan] Enter your password to deactivate Tor: ")
-		stop(pswd)
+	while True:
+		if args.command == "start":
+			pswd = console.input("[bold cyan] Enter your password to activate Tor: ")
+			start(pswd)
+			if args.interface:
+				change_mac(args.interface)
+		elif args.command == "stop":
+			pswd = console.input("[bold cyan] Enter your password to deactivate Tor: ")
+			stop(pswd)
+		elif args.command == "status":
+			check_status()
 
 if __name__ == "__main__":
-	main() 
+	with daemon.DaemonContext(): # ! Deamonize this (for UNIX only)
+		main()
 
